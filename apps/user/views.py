@@ -6,45 +6,45 @@ from django.contrib.auth import authenticate
 from apps.base.auth import JWTTokenGenerator
 from apps.user.models import User
 from apps.user.serializers import (
-    LoginSerializer, RefreshTokenSerializer, UserProfileSerializer,
-    LoginResponseSerializer, RefreshResponseSerializer, LogoutResponseSerializer,
-    ErrorSerializer
+    RefreshTokenSerializer, UserProfileSerializer,
+    RefreshResponseSerializer, LogoutResponseSerializer,
+    ErrorSerializer, OTPLoginSerializer, OTPLoginResponseSerializer
 )
+from apps.base.redis_service import redis_service
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
 
 class LoginView(APIView):
     """
-    Login endpoint that returns JWT token
+    OTP-based login endpoint (main login method)
     """
     permission_classes = [AllowAny]
-    serializer_class = LoginSerializer
+    serializer_class = OTPLoginSerializer
     
     @extend_schema(
         operation_id='user_login',
-        summary='User Login',
-        description='Authenticate user with phone number and password, returns JWT tokens',
-        request=LoginSerializer,
+        summary='User Login (OTP)',
+        description='Login using OTP code received from Telegram bot. This is the main login method.',
+        request=OTPLoginSerializer,
         responses={
-            200: LoginResponseSerializer,
+            200: OTPLoginResponseSerializer,
             400: ErrorSerializer,
             401: ErrorSerializer,
         },
         examples=[
             OpenApiExample(
-                'Login Request',
-                summary='Login with phone number and password',
-                description='Example login request',
+                'OTP Login Request',
+                summary='OTP login request',
+                description='Example OTP login request - only OTP code needed',
                 value={
-                    'phone_number': '998931159963',
-                    'password': 'your_password'
+                    'otp': '123456'
                 },
                 request_only=True
             ),
             OpenApiExample(
-                'Login Success Response',
-                summary='Successful login response',
-                description='Response when login is successful',
+                'OTP Login Success Response',
+                summary='Successful OTP login response',
+                description='Response when OTP login is successful',
                 value={
                     'access_token': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...',
                     'refresh_token': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...',
@@ -57,51 +57,78 @@ class LoginView(APIView):
                         'is_verified': True,
                         'created_at': '2024-01-01T00:00:00Z',
                         'updated_at': '2024-01-01T00:00:00Z'
-                    }
+                    },
+                    'is_new_user': False
                 },
                 response_only=True
             )
         ]
     )
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = OTPLoginSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        phone_number = serializer.validated_data['phone_number']
-        password = serializer.validated_data['password']
+        otp = serializer.validated_data['otp']
         
-        try:
-            user = User.objects.get(phone_number=phone_number)
-            if user.check_password(password):
-                token = JWTTokenGenerator.generate_token(user)
-                refresh_token = JWTTokenGenerator.generate_refresh_token(user)
-                
-                response_data = {
-                    'access_token': token,
-                    'refresh_token': refresh_token,
-                    'user': {
-                        'id': str(user.id),
-                        'phone_number': user.phone_number,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
-                        'email': user.email,
-                        'is_verified': user.is_verified,
-                    }
-                }
-                
-                response_serializer = LoginResponseSerializer(response_data)
-                return Response(response_serializer.data)
-            else:
-                return Response(
-                    {'error': 'Invalid credentials'}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-        except User.DoesNotExist:
+        # Verify OTP and get phone number
+        otp_data = redis_service.verify_otp(otp)
+        if not otp_data:
             return Response(
-                {'error': 'User not found'}, 
+                {'error': 'Invalid or expired OTP code'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
+        
+        phone_number = otp_data.get('phone_number')
+        
+        # Get user data from Redis
+        user_data = redis_service.get_user_data(phone_number)
+        if not user_data:
+            return Response(
+                {'error': 'User data not found. Please try again.'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Check if user exists in database
+        try:
+            user = User.objects.get(phone_number=phone_number)
+            is_new_user = False
+        except User.DoesNotExist:
+            # Create new user
+            user = User.objects.create(
+                phone_number=phone_number,
+                first_name=user_data.get('first_name', ''),
+                last_name=user_data.get('last_name', ''),
+                tg_user_id=user_data.get('tg_user_id'),
+                is_verified=True  # OTP verification means user is verified
+            )
+            is_new_user = True
+        
+        # Generate tokens
+        token = JWTTokenGenerator.generate_token(user)
+        refresh_token = JWTTokenGenerator.generate_refresh_token(user)
+        
+        # Clean up Redis data
+        redis_service.delete_user_data(phone_number)
+        
+        response_data = {
+            'access_token': token,
+            'refresh_token': refresh_token,
+            'user': {
+                'id': str(user.id),
+                'phone_number': user.phone_number,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'is_verified': user.is_verified,
+                'created_at': user.created_at,
+                'updated_at': user.updated_at,
+            },
+            'is_new_user': is_new_user
+        }
+        
+        response_serializer = OTPLoginResponseSerializer(response_data)
+        return Response(response_serializer.data)
 
 
 class RefreshTokenView(APIView):
@@ -244,3 +271,5 @@ class LogoutView(APIView):
     def post(self, request):
         serializer = LogoutResponseSerializer({'message': 'Successfully logged out'})
         return Response(serializer.data)
+
+

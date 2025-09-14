@@ -19,3 +19,6 @@ shell:
 
 dbshell:
 	python manage.py dbshell
+
+runbot:
+	python manage.py run_bot

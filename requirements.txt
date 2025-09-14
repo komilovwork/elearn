@@ -30,3 +30,5 @@ uritemplate==4.2.0
 uvicorn==0.35.0
 virtualenv==20.34.0
 whitenoise==6.10.0
+aiogram==3.2.0
+redis==5.0.1

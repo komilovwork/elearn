@@ -33,6 +33,7 @@ EXTERNAL_APPS = [
 LOCAL_APPS = [
     "apps.base",
     "apps.user",
+    "apps.telegram",
 ]
 
 INSTALLED_APPS = [
@@ -74,6 +75,10 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 
+###############################
+### DATABASES CONFIGURATION ###
+###############################
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -111,6 +116,10 @@ USE_I18N = True
 USE_TZ = True
 
 
+##############################
+### STORAGES CONFIGURATION ###
+##############################
+
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
@@ -126,7 +135,40 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+#######################
+### AUTH USER MODEL ###
+#######################
+
 AUTH_USER_MODEL = 'user.User'
+
+
+###########################
+### REDIS CONFIGURATION ###
+###########################
+
+REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+
+
+##############################
+### TELEGRAM CONFIGURATION ###
+##############################
+
+TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_WEBHOOK_URL = config('TELEGRAM_WEBHOOK_URL', default='')
+
+
+#########################
+### OTP CONFIGURATION ###
+#########################
+
+OTP_LENGTH = 6
+OTP_TTL = 120
+
+
+####################################
+### REST FRAMEWORK CONFIGURATION ###
+####################################
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -140,6 +182,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
+
+
+#################################
+### SPECTACULAR CONFIGURATION ###
+#################################
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "API",

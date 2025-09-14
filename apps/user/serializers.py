@@ -37,3 +37,14 @@ class LogoutResponseSerializer(serializers.Serializer):
 
 class ErrorSerializer(serializers.Serializer):
     error = serializers.CharField(help_text="Error message")
+
+
+class OTPLoginSerializer(serializers.Serializer):
+    otp = serializers.CharField(max_length=6, help_text="6-digit OTP code")
+
+
+class OTPLoginResponseSerializer(serializers.Serializer):
+    access_token = serializers.CharField(help_text="JWT access token")
+    refresh_token = serializers.CharField(help_text="JWT refresh token")
+    user = UserProfileSerializer(help_text="User profile information")
+    is_new_user = serializers.BooleanField(help_text="Whether this is a new user")
