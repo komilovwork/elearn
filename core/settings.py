@@ -31,6 +31,7 @@ EXTERNAL_APPS = [
 ]
 
 LOCAL_APPS = [
+    "base",
     "user",
 ]
 
@@ -125,6 +126,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+AUTH_USER_MODEL = 'user.User'
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
