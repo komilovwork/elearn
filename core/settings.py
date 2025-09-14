@@ -31,8 +31,8 @@ EXTERNAL_APPS = [
 ]
 
 LOCAL_APPS = [
-    "base",
-    "user",
+    "apps.base",
+    "apps.user",
 ]
 
 INSTALLED_APPS = [
@@ -129,6 +129,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = 'user.User'
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'apps.base.auth.JWTAuthentication',
+        'apps.base.auth.BasicAuth',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
     ],
